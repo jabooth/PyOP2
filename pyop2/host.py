@@ -152,7 +152,8 @@ class Arg(base.Arg):
                          'dim': shape[0],
                          'name': self.c_kernel_arg_name(i, j)}
                 else:
-                    raise RuntimeError("Don't know how to pass kernel arg %s" % self)
+                    raise RuntimeError(
+                        "Don't know how to pass kernel arg %s" % self)
             else:
                 if self.data is not None and self.data.dataset.set.layers > 1:
                     return self.c_ind_data_xtr("i_%d" % self.idx.index, i)
@@ -619,10 +620,12 @@ class JITModule(base.JITModule):
 
         if len(Const._defs) > 0:
             _const_args = ', '
-            _const_args += ', '.join([c_const_arg(c) for c in Const._definitions()])
+            _const_args += ', '.join(
+                [c_const_arg(c) for c in Const._definitions()])
         else:
             _const_args = ''
-        _const_inits = ';\n'.join([c_const_init(c) for c in Const._definitions()])
+        _const_inits = ';\n'.join([c_const_init(c)
+                                  for c in Const._definitions()])
 
         _intermediate_globals_decl = ';\n'.join(
             [arg.c_intermediate_globals_decl(count)
@@ -681,9 +684,17 @@ class JITModule(base.JITModule):
                                          if arg._is_vec_map and not arg._flatten])
             _extr_loop = '\n' + extrusion_loop()
             _extr_loop_close = '}\n'
+            if _map_decl != '':
+                _privates = ' private(' + ','.join([','.join(["xtr_" + arg.c_map_name(idx) for idx in range(2)]) for arg in self._args
+                                                    if arg._is_mat and arg.data._is_scalar_field]) + \
+                    ','.join(["xtr_" + arg.c_map_name() for arg in self._args
+                              if arg._uses_itspace and not arg._is_mat]) + ')'
+            else:
+                _privates = ''
         else:
             _off_args = ""
             _off_inits = ""
+            _privates = ""
 
         # Build kernel invokation. Let X be a parameter of the kernel representing a tensor
         # accessed in an iteration space. Let BUFFER be an array of the same size as X.
@@ -792,4 +803,5 @@ class JITModule(base.JITModule):
                 'buffer_decl': _buf_decl,
                 'buffer_gather': _buf_gather,
                 'kernel_args': _kernel_args,
+                'privates': _privates,
                 'itset_loop_body': '\n'.join([itset_loop_body(i, j, shape, offsets) for i, j, shape, offsets in self._itspace])}
