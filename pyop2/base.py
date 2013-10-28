@@ -3003,17 +3003,18 @@ class ParLoop(LazyComputation):
 
     def _run(self):
         if configuration["profile"]:
-            loop_name = "_".join([self._kernel.name,
-                                  self.it_space.name.split("/")[-1],
-                                  self._kernel.cache_key])
-            vol = sum([arg.data.dataset.set.size * arg.data.cdim * arg.data.dtype.itemsize
-                       for arg in self.args if arg._is_dat])
-            vol += sum([(arg.data._sparsity.onz + arg.data._sparsity.nz) *
-                        arg.dtype.itemsize for arg in self.args if arg._is_mat])
-            p.data_volume(loop_name, vol)
-            p.tic(loop_name)
+            self.loop_name = "_".join([self._kernel.name,
+                                      self.it_space.name.split("/")[-1],
+                                      self._kernel.cache_key])
+            self.vol = sum([arg.data.dataset.set.size * arg.data.cdim *
+                            arg.data.dtype.itemsize
+                            for arg in self.args if arg._is_dat])
+            self.vol += sum([(arg.data._sparsity.onz + arg.data._sparsity.nz) *
+                            arg.dtype.itemsize for arg in self.args if arg._is_mat])
+            p.data_volume(self.loop_name, self.vol)
+            p.tic(self.loop_name)
             c = self.compute()
-            p.toc(loop_name)
+            p.toc(self.loop_name)
             return c
         else:
             return self.compute()
