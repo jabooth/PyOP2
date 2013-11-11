@@ -132,7 +132,7 @@ class JITModule(host.JITModule):
     _system_headers = ['omp.h']
 
     _wrapper = """
-void wrap_%(kernel_name)s__(PyObject* _boffset,
+double wrap_%(kernel_name)s__(PyObject* _boffset,
                             PyObject* _nblocks,
                             PyObject* _blkmap,
                             PyObject* _offset,
@@ -161,9 +161,14 @@ void wrap_%(kernel_name)s__(PyObject* _boffset,
   int nthread = 1;
   #endif
 
+  //likwid_markerInit();
+  long start_t, end_t;
+  start_t = stamp();
   #pragma omp parallel shared(boffset, nblocks, nelems, blkmap) %(privates)s
   {
     %(map_decl)s
+    //likwid_markerThreadInit();
+    //likwid_markerStartRegion("accumulate");
     int tid = omp_get_thread_num();
     %(interm_globals_decl)s;
     %(interm_globals_init)s;
@@ -191,7 +196,11 @@ void wrap_%(kernel_name)s__(PyObject* _boffset,
       }
     }
     %(interm_globals_writeback)s;
+    //likwid_markerStopRegion("accumulate");
   }
+  end_t = stamp();
+  //likwid_markerClose();
+  return  (end_t-start_t)/(1000.0*1000.0*1000);
 }
 """
 
@@ -253,12 +262,24 @@ class ParLoop(device.ParLoop, host.ParLoop):
             self._jit_args[4] = plan.nelems
 
             boffset = 0
-            for c in range(plan.ncolors):
-                nblocks = plan.ncolblk[c]
-                self._jit_args[0] = boffset
-                self._jit_args[1] = nblocks
-                fun(*self._jit_args)
-                boffset += nblocks
+            if configuration["profile"]:
+                p.tic_call(self.loop_name)
+                loop_time = 0.0
+                for c in range(plan.ncolors):
+                    nblocks = plan.ncolblk[c]
+                    self._jit_args[0] = boffset
+                    self._jit_args[1] = nblocks
+                    loop_time += fun(*self._jit_args)
+                    boffset += nblocks
+                p.toc_call(self.loop_name)
+                p.time(self.loop_name, loop_time)
+            else:
+                for c in range(plan.ncolors):
+                    nblocks = plan.ncolblk[c]
+                    self._jit_args[0] = boffset
+                    self._jit_args[1] = nblocks
+                    fun(*self._jit_args)
+                    boffset += nblocks
 
     def _get_plan(self, part, part_size):
         if self._is_indirect:
