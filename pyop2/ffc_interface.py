@@ -39,7 +39,7 @@ import os
 import tempfile
 import numpy as np
 
-from ufl import Argument, Form, MixedElement
+from ufl import Argument, Coefficient, Form, MixedElement
 from ufl.algorithms import as_form, traverse_terminals, ReuseTransformer
 from ufl.indexed import Indexed
 from ufl.indexing import FixedIndex, MultiIndex
@@ -212,6 +212,11 @@ class FormSplitter(ReuseTransformer):
         """Split an argument into its constituent spaces."""
         return [(i, Argument(e, o.count()))
                 for i, e in enumerate(o.element().mixed_sub_elements())]
+
+    def coefficient(self, o):
+        """Split an argument into its constituent spaces."""
+        return [Coefficient(e, o.count())
+                for e in o.element().mixed_sub_elements()]
 
 
 class FFCKernel(DiskCached, KernelCached):
