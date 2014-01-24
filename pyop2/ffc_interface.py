@@ -93,10 +93,10 @@ class FormSplitter(ReuseTransformer):
         fd = form.form_data()
         # If there is no mixed element involved, return the unmodified form
         if not any(isinstance(e, MixedElement) for e in fd.unique_sub_elements):
-            return form
-        return [[(idx, f * i.measure())
-                 for idx, f in as_list(self.visit(i.integrand()))]
-                for i in form.integrals()]
+            return [(tuple([0] * fd.rank), form)]
+        return [(idx, f * i.measure())
+                for i in form.integrals()
+                for idx, f in as_list(self.visit(i.integrand()))]
 
     def sum(self, o, l, r):
 
@@ -240,13 +240,13 @@ class FFCKernel(DiskCached, KernelCached):
         ffc_tree = [(block, ffc_compile_form(form,
                                              prefix=name + blockid(block),
                                              parameters=ffc_parameters))
-                    for form_list in forms for block, form in form_list]
+                    for block, form in forms]
         ast = Root([incl] + [subtree for _, tree in ffc_tree for subtree in tree])
 
-        self.kernels = tuple([Kernel(ast, '%s_%s_integral_0_%s' %
+        self.kernels = tuple(Kernel(ast, '%s_%s_integral_0_%s' %
                             (name + blockid(block), ida.domain_type, ida.domain_id))
-            for form_list in forms for block, form in form_list
-            for ida in form.form_data().integral_data])
+            for block, form in forms
+            for ida in form.form_data().integral_data)
         self._initialized = True
 
 
