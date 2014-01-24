@@ -52,6 +52,7 @@ from op2 import Kernel
 from mpi import MPI
 
 from ir.ast_base import PreprocessNode, Root
+from utils import as_tuple
 
 _form_cache = {}
 
@@ -226,19 +227,23 @@ class FFCKernel(DiskCached, KernelCached):
                    _pyop2_geometry_md5 + constants.FFC_VERSION +
                    constants.PYOP2_VERSION).hexdigest()
 
-    def __init__(self, form, name):
+    def __init__(self, original_form, name):
         if self._initialized:
             return
 
         incl = PreprocessNode('#include "pyop2_geometry.h"\n')
-        ffc_tree = ffc_compile_form(form, prefix=name, parameters=ffc_parameters)
-        ast = Root([incl] + [subtree for subtree in ffc_tree])
-
-        form_data = form.form_data()
+        forms = FormSplitter().split(original_form)
+        blockid = lambda block: ''.join(["_%d" % i for i in as_tuple(block)])
+        ffc_tree = [(block, ffc_compile_form(form,
+                                             prefix=name + blockid(block),
+                                             parameters=ffc_parameters))
+                    for form_list in forms for block, form in form_list]
+        ast = Root([incl] + [subtree for _, tree in ffc_tree for subtree in tree])
 
         self.kernels = tuple([Kernel(ast, '%s_%s_integral_0_%s' %
-                            (name, ida.domain_type, ida.domain_id))
-            for ida in form_data.integral_data])
+                            (name + blockid(block), ida.domain_type, ida.domain_id))
+            for form_list in forms for block, form in form_list
+            for ida in form.form_data().integral_data])
         self._initialized = True
 
 
